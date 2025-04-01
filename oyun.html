@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jet Savaşı</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+            touch-action: manipulation;
+        }
+        #gameCanvas {
+            display: block;
+            margin: 0 auto;
+            background: #000;
+            border: 2px solid #444;
+        }
+        #gameUI {
+            color: white;
+            text-align: center;
+            padding: 10px;
+            text-shadow: 2px 2px 4px #000;
+            position: absolute;
+            top: 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 10;
+        }
+        #startButton {
+            padding: 15px 30px;
+            font-size: 24px;
+            background: linear-gradient(to bottom, #f46b45, #eea849);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+            box-shadow: 0 0 15px rgba(238, 168, 73, 0.7);
+        }
+        #controls {
+            margin-top: 20px;
+            color: #ddd;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 90%;
+            text-align: center;
+        }
+        .title {
+            font-size: 36px;
+            margin-bottom: 15px;
+            color: #f46b45;
+            text-shadow: 3px 3px 6px #000;
+            font-family: 'Impact', sans-serif;
+        }
+        .game-over {
+            color: #ff5555;
+            font-size: 30px;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px #000;
+        }
+        .health-bar {
+            width: 100px;
+            height: 15px;
+            background-color: #333;
+            border-radius: 7px;
+            margin: 5px auto;
+            overflow: hidden;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(to right, #ff0000, #ff5e00);
+            width: 100%;
+            transition: width 0.3s;
+        }
+        #mobileControls {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 5;
+        }
+        .mobile-btn {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 24px;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #fireBtn {
+            position: absolute;
+            right: 20px;
+            bottom: 100px;
+            background-color: rgba(255, 0, 0, 0.3);
+            width: 80px;
+            height: 80px;
+        }
+        .powerup-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            background-color: rgba(52, 152, 219, 0.5);
+            border-radius: 10px;
+            margin-left: 5px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameUI">
+        <div>Skor: <span id="score">0</span> | Can: <span id="lives">3</span> <div class="health-bar"><div id="healthFill" class="health-fill"></div></div></div>
+        <div>Güç: <span id="powerup">Yok</span></div>
+    </div>
+    
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="mobileControls">
+        <div id="leftBtn" class="mobile-btn">←</div>
+        <div id="rightBtn" class="mobile-btn">→</div>
+        <div id="upBtn" class="mobile-btn">↑</div>
+        <div id="downBtn" class="mobile-btn">↓</div>
+    </div>
+    <div id="fireBtn" class="mobile-btn">🔫</div>
+    
+    <div id="startScreen">
+        <div class="title">JET SAVAŞI</div>
+        <p>Göktaşlarını yok et ve uzayı koru!</p>
+        <div id="controls">
+            <strong>ÖZEL GÜÇLER:</strong><br>
+            <span style="color:#2ecc71">Yeşil Kutu</span> - +1 Can<br>
+            <span style="color:#3498db">Mavi Kutu</span> - Klonlanma (10s)<br>
+            <span style="color:#e74c3c">Kırmızı Kutu</span> - Hız Artışı (8s)<br>
+            <span style="color:#9b59b6">Mor Kutu</span> - Çift Ateş (12s)
+        </div>
+        <button id="startButton">OYUNA BAŞLA</button>
+    </div>
+
+    <script>
+        // Oyun boyutlarını ayarla (mobil uyumlu)
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        resizeCanvas();
+        
+        function resizeCanvas() {
+            const size = Math.min(window.innerWidth, window.innerHeight * 1.5);
+            canvas.width = size;
+            canvas.height = Math.min(window.innerHeight, window.innerWidth * 1.5);
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Resimler
+        const jetImg = new Image();
+        jetImg.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cGF0aCBkPSJNODAgNTBMNTAgODBMNTAgNzBMNjAgNTBMNTAgMzBMNTAgMjBMODAgNTBaIiBmaWxsPSIjMzQ5OGRiIiBzdHJva2U9IiMyYzNlNTAiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ9Ik0yMCA1MEw1MCAyMEw1MCAzMEw0MCA1MEw1MCA3MEw1MCA4MEwyMCA1MFoiIGZpbGw9IiMzNDk4ZGIiIHN0cm9rZT0iIzJjM2U1MCIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTUwIDQ1TDUwIDU1TTQwIDUwTDYwIDUwIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMiIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjE1IiBmaWxsPSIjMmMzZTUwIi8+PC9zdmc+';
+        
+        const meteorImgs = [
+            'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIGZpbGw9IiM3ODVhNjMiLz48cGF0aCBkPSJNMzAgMjBDNTAgNDAgNDAgNzAgNTAgODBDNjAgNzAgNTAgNDAgMzAgMjBaIiBmaWxsPSIjOWNjN2MxIiBzdHJva2U9IiM2NzQyMjEiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ9Ik0yMCAzMEMxMCA0MCAwIDYwIDIwIDcwQzMwIDgwIDUwIDYwIDYwIDUwQzcwIDQwIDUwIDIwIDQwIDMwQzMwIDQwIDIwIDIwIDIwIDMwWiIgZmlsbD0iI2IzOGMxZCIgc3Ryb2tlPSIjODU1ODFkIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4=',
+            'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIGZpbGw9IiM1ZDhjYzAiLz48cGF0aCBkPSJNMzAgMTVDNTAgMzUgNDAgNjAgNTAgNzBDNjAgNjAgNTAgMzUgMzAgMTVaIiBmaWxsPSIjOGNiZmE1IiBzdHJva2U9IiMzZDc5YjEiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ9Ik0yMCAyNUMxMCAzNSAwIDU1IDIwIDY1QzMwIDc1IDUwIDU1IDYwIDQ1QzcwIDM1IDUwIDE1IDQwIDI1QzMwIDM1IDIwIDE1IDIwIDI1WiIgZmlsbD0iI2I5ZTRkMyIgc3Ryb2tlPSIjN2NiY2UwIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4=',
+            'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIGZpbGw9IiNjMzkzNTUiLz48cGF0aCBkPSJNMzAgMTVDNTAgMzUgNDAgNjAgNTAgNzBDNjAgNjAgNTAgMzUgMzAgMTVaIiBmaWxsPSIjZTc3YzdjIiBzdHJva2U9IiNhNTI4MmIiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ9Ik0yMCAyNUMxMCAzNSAwIDU1IDIwIDY1QzMwIDc1IDUwIDU1IDYwIDQ1QzcwIDM1IDUwIDE1IDQwIDI1QzMwIDM1IDIwIDE1IDIwIDI1WiIgZmlsbD0iI2Y4YmNjNSIgc3Ryb2tlPSIjZDY1YTVkIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4='
+        ].map(src => {
+            const img = new Image();
+            img.src = src;
+            return img;
+        });
+        
+        // Güç kutusu görselleri
+        const powerupImgs = {
+            health: createPowerupImage('#2ecc71'),
+            clone: createPowerupImage('#3498db'),
+            speed: createPowerupImage('#e74c3c'),
+            double: createPowerupImage('#9b59b6')
+        };
+        
+        function createPowerupImage(color) {
+            const img = new Image();
+            img.src = `data:image/svg+xml;base64,${btoa(`
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
+                    <rect x="10" y="10" width="30" height="30" rx="5" fill="${color}"/>
+                    <rect x="15" y="15" width="20" height="20" rx="3" fill="white" opacity="0.3"/>
+                </svg>
+            `)}`;
+            return img;
+        }
+        
+        // Oyun durumu
+        let score = 0;
+        let lives = 3;
+        let health = 100;
+        let gameRunning = false;
+        let animationFrameId;
+        let gameOverEffect = false;
+        let gameOverTimer = 0;
+        let lastMeteorSpawn = 0;
+        let meteorSpeed = 2;
+        let maxMeteorSpeed = 6;
+        let meteorSpawnRate = 1500;
+        let difficultyIncreaseInterval = 5000;
+        let lastDifficultyIncrease = 0;
+        let powerupActive = null;
+        let powerupEndTime = 0;
+        let cloneJet = null;
+        
+        // Jet özellikleri
+        const jet = {
+            x: canvas.width / 2,
+            y: canvas.height - 100,
+            width: 60,
+            height: 50,
+            speed: 6,
+            baseSpeed: 6,
+            img: jetImg,
+            bullets: [],
+            lastShot: 0,
+            shootDelay: 300,
+            engineParticles: []
+        };
+        
+        // Göktaşları
+        const meteors = [];
+        const powerups = [];
+        const explosions = [];
+        const bullets = [];
+        
+        // Yıldızlar arka plan için
+        const stars = [];
+        for (let i = 0; i < 100; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2 + 1,
+                speed: Math.random() * 0.5 + 0.1,
+                alpha: Math.random() * 0.5 + 0.5
+            });
+        }
+        
+        // Tuş kontrolleri
+        const keys = {
+            ArrowUp: false,
+            ArrowDown: false,
+            ArrowLeft: false,
+            ArrowRight: false,
+            w: false,
+            a: false,
+            s: false,
+            d: false,
+            ' ': false
+        };
+        
+        // Mobil kontroller
+        const mobileBtns = {
+            left: false,
+            right: false,
+            up: false,
+            down: false,
+            fire: false
+        };
+        
+        // Olay dinleyicileri
+        window.addEventListener('keydown', (e) => {
+            if (keys.hasOwnProperty(e.key)) {
+                keys[e.key] = true;
+                
+                if (e.key === ' ' && gameRunning) {
+                    shootBullet();
+                }
+            }
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.key)) {
+                keys[e.key] = false;
+            }
+        });
+        
+        // Mobil kontroller
+        document.getElementById('leftBtn').addEventListener('touchstart', () => mobileBtns.left = true);
+        document.getElementById('leftBtn').addEventListener('touchend', () => mobileBtns.left = false);
+        document.getElementById('rightBtn').addEventListener('touchstart', () => mobileBtns.right = true);
+        document.getElementById('rightBtn').addEventListener('touchend', () => mobileBtns.right = false);
+        document.getElementById('upBtn').addEventListener('touchstart', () => mobileBtns.up = true);
+        document.getElementById('upBtn').addEventListener('touchend', () => mobileBtns.up = false);
+        document.getElementById('downBtn').addEventListener('touchstart', () => mobileBtns.down = true);
+        document.getElementById('downBtn').addEventListener('touchend', () => mobileBtns.down = false);
+        document.getElementById('fireBtn').addEventListener('touchstart', () => {
+            mobileBtns.fire = true;
+            if (gameRunning) shootBullet();
+        });
+        document.getElementById('fireBtn').addEventListener('touchend', () => mobileBtns.fire = false);
+        
+        startButton.addEventListener('click', startGame);
+        
+        // Oyun fonksiyonları
+        function startGame() {
+            startScreen.style.display = 'none';
+            score = 0;
+            lives = 3;
+            health = 100;
+            updateUI();
+            gameRunning = true;
+            gameOverEffect = false;
+            meteors.length = 0;
+            powerups.length = 0;
+            explosions.length = 0;
+            bullets.length = 0;
+            jet.bullets.length = 0;
+            jet.engineParticles.length = 0;
+            powerupActive = null;
+            cloneJet = null;
+            meteorSpeed = 2;
+            maxMeteorSpeed = 6;
+            meteorSpawnRate = 1500;
+            lastDifficultyIncrease = Date.now();
+            
+            // Jet başlangıç pozisyonu
+            jet.x = canvas.width / 2;
+            jet.y = canvas.height - 100;
+            jet.speed = jet.baseSpeed;
+            
+            // Oyun döngüsünü başlat
+            gameLoop();
+        }
+        
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+            
+            // Temizle
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Arka plan
+            drawBackground();
+            
+            // Zorluk artışı
+            if (timestamp - lastDifficultyIncrease > difficultyIncreaseInterval) {
+                increaseDifficulty();
+                lastDifficultyIncrease = timestamp;
+            }
+            
+            // Jet hareketi
+            updateJet(timestamp);
+            
+            // Klon jet varsa güncelle
+            if (cloneJet) {
+                updateCloneJet(timestamp);
+            }
+            
+            // Göktaşı spawn
+            if (timestamp - lastMeteorSpawn > meteorSpawnRate) {
+                spawnMeteor();
+                lastMeteorSpawn = timestamp;
+            }
+            
+            // Güç kutusu spawn (rastgele)
+            if (Math.random() < 0.005 && powerups.length < 2) {
+                spawnPowerup();
+            }
+            
+            // Göktaşlarını güncelle
+            updateMeteors();
+            
+            // Güç kutularını güncelle
+            updatePowerups();
+            
+            // Mermileri güncelle
+            updateBullets();
+            
+            // Patlamaları güncelle
+            updateExplosions(timestamp);
+            
+            // Güç zamanlayıcı
+            updatePowerTimer(timestamp);
+            
+            // Çarpışma kontrolü
+            checkCollisions();
+            
+            // Oyun döngüsünü devam ettir
+            animationFrameId = requestAnimationFrame(gameLoop);
+            
+            // Game over efekti
+            if (gameOverEffect) {
+                gameOverTimer++;
+                const alpha = Math.min(0.7, gameOverTimer / 100);
+                ctx.fillStyle = `rgba(200, 50, 50, ${alpha})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                if (gameOverTimer > 120) {
+                    gameOver();
+                }
+            }
+        }
+        
+        function drawBackground() {
+            // Uzay arka planı
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Yıldızlar
+            for (const star of stars) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
+                ctx.fillRect(star.x, star.y, star.size, star.size);
+                
+                // Hareket efekti
+                star.y += star.speed;
+                if (star.y > canvas.height) {
+                    star.y = 0;
+                    star.x = Math.random() * canvas.width;
+                }
+            }
+        }
+        
+        function increaseDifficulty() {
+            if (meteorSpeed < maxMeteorSpeed) {
+                meteorSpeed = Math.min(maxMeteorSpeed, meteorSpeed + 0.3);
+            }
+            
+            if (meteorSpawnRate > 600) {
+                meteorSpawnRate -= 100;
+            }
+        }
+        
+        function updateJet(timestamp) {
+            // Hareket (klavye)
+            if (keys.ArrowUp || keys.w || mobileBtns.up) jet.y -= jet.speed;
+            if (keys.ArrowDown || keys.s || mobileBtns.down) jet.y += jet.speed;
+            if (keys.ArrowLeft || keys.a || mobileBtns.left) jet.x -= jet.speed;
+            if (keys.ArrowRight || keys.d || mobileBtns.right) jet.x += jet.speed;
+            
+            // Sınır kontrolü
+            jet.x = Math.max(0, Math.min(canvas.width - jet.width, jet.x));
+            jet.y = Math.max(0, Math.min(canvas.height - jet.height, jet.y));
+            
+            // Motor partikülleri
+            if (gameRunning && !gameOverEffect) {
+                if (Math.random() < 0.5) {
+                    jet.engineParticles.push({
+                        x: jet.x + jet.width / 2 + (Math.random() - 0.5) * 10,
+                        y: jet.y + jet.height,
+                        size: Math.random() * 4 + 3,
+                        speedY: Math.random() * 4 + 3,
+                        color: `hsl(${Math.random() * 40 + 30}, 100%, 50%)`,
+                        life: 30 + Math.random() * 20
+                    });
+                }
+                
+                // Partikülleri güncelle
+                for (let i = jet.engineParticles.length - 1; i >= 0; i--) {
+                    const p = jet.engineParticles[i];
+                    p.y += p.speedY;
+                    p.life--;
+                    
+                    if (p.life <= 0) {
+                        jet.engineParticles.splice(i, 1);
+                    }
+                }
+            }
+            
+            // Jet çiz
+            ctx.save();
+            ctx.translate(jet.x + jet.width / 2, jet.y + jet.height / 2);
+            
+            // Hareket yönüne göre hafif döndürme
+            let angle = 0;
+            if ((keys.ArrowLeft || keys.a || mobileBtns.left) && !(keys.ArrowRight || keys.d || mobileBtns.right)) angle = -0.2;
+            if ((keys.ArrowRight || keys.d || mobileBtns.right) && !(keys.ArrowLeft || keys.a || mobileBtns.left)) angle = 0.2;
+            ctx.rotate(angle);
+            
+            ctx.drawImage(jet.img, -jet.width / 2, -jet.height / 2, jet.width, jet.height);
+            ctx.restore();
+            
+            // Motor partiküllerini çiz
+            for (const p of jet.engineParticles) {
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Ateş butonuna basılıysa ateş et
+            if ((keys[' '] || mobileBtns.fire) && timestamp - jet.lastShot > jet.shootDelay) {
+                shootBullet();
+                jet.lastShot = timestamp;
+            }
+        }
+        
+        function updateCloneJet(timestamp) {
+            // Klon jeti çiz
+            ctx.save();
+            ctx.translate(cloneJet.x + jet.width / 2, cloneJet.y + jet.height / 2);
+            ctx.globalAlpha = 0.7; // Yarı saydam
+            ctx.drawImage(jet.img, -jet.width / 2, -jet.height / 2, jet.width, jet.height);
+            ctx.restore();
+            
+            // Klon jet ateş etme
+            if (timestamp - cloneJet.lastShot > jet.shootDelay) {
+                bullets.push({
+                    x: cloneJet.x + jet.width / 2 - 2.5,
+                    y: cloneJet.y,
+                    width: 5,
+                    height: 15,
+                    speed: 10,
+                    color: '#3498db'
+                });
+                cloneJet.lastShot = timestamp;
+            }
+        }
+        
+        function shootBullet() {
+            // Normal mermi
+            bullets.push({
+                x: jet.x + jet.width / 2 - 2.5,
+                y: jet.y,
+                width: 5,
+                height: 15,
+                speed: 10,
+                color: '#f1c40f'
+            });
+            
+            // Çift ateş aktifse ek mermi
+            if (powerupActive === 'double') {
+                bullets.push({
+                    x: jet.x + jet.width / 2 - 15,
+                    y: jet.y + 10,
+                    width: 5,
+                    height: 15,
+                    speed: 10,
+                    color: '#9b59b6'
+                });
+                bullets.push({
+                    x: jet.x + jet.width / 2 + 10,
+                    y: jet.y + 10,
+                    width: 5,
+                    height: 15,
+                    speed: 10,
+                    color: '#9b59b6'
+                });
+            }
+            
+            jet.lastShot = Date.now();
+        }
+        
+        function spawnMeteor() {
+            const size = 30 + Math.random() * 40;
+            const type = Math.floor(Math.random() * meteorImgs.length);
+            meteors.push({
+                x: Math.random() * (canvas.width - size),
+                y: -size,
+                width: size,
+                height: size,
+                speed: meteorSpeed + Math.random() * 2,
+                type: type,
+                img: meteorImgs[type],
+                rotation: Math.random() * Math.PI * 2,
+                rotationSpeed: (Math.random() - 0.5) * 0.05,
+                health: 1 + Math.floor(size / 20) // Büyük göktaşları daha dayanıklı
+            });
+        }
+        
+        function spawnPowerup() {
+            const types = ['health', 'clone', 'speed', 'double'];
+            const weights = [0.4, 0.3, 0.2, 0.1]; // Can daha sık çıksın
+            let randomValue = Math.random();
+            let selectedType = 'health';
+            
+            for (let i = 0; i < types.length; i++) {
+                if (randomValue < weights[i]) {
+                    selectedType = types[i];
+                    break;
+                }
+                randomValue -= weights[i];
+            }
+            
+            powerups.push({
+                x: Math.random() * (canvas.width - 30),
+                y: -30,
+                width: 30,
+                height: 30,
+                speed: 2,
+                type: selectedType,
+                img: powerupImgs[selectedType]
+            });
+        }
+        
+        function updateMeteors() {
+            for (let i = meteors.length - 1; i >= 0; i--) {
+                const meteor = meteors[i];
+                meteor.y += meteor.speed;
+                meteor.rotation += meteor.rotationSpeed;
+                
+                // Göktaşını çiz
+                ctx.save();
+                ctx.translate(meteor.x + meteor.width / 2, meteor.y + meteor.height / 2);
+                ctx.rotate(meteor.rotation);
+                ctx.drawImage(meteor.img, -meteor.width / 2, -meteor.height / 2, meteor.width, meteor.height);
+                ctx.restore();
+                
+                // Ekran dışına çıkan göktaşlarını kaldır
+                if (meteor.y > canvas.height) {
+                    meteors.splice(i, 1);
+                }
+            }
+        }
+        
+        function updatePowerups() {
+            for (let i = powerups.length - 1; i >= 0; i--) {
+                const powerup = powerups[i];
+                powerup.y += powerup.speed;
+                
+                // Güç kutusunu çiz
+                ctx.drawImage(powerup.img, powerup.x, powerup.y, powerup.width, powerup.height);
+                
+                // Parlama efekti
+                const pulseSize = Math.sin(Date.now() / 200) * 5 + 5;
+                ctx.fillStyle = powerup.type === 'health' ? 'rgba(46, 204, 113, 0.3)' : 
+                                powerup.type === 'clone' ? 'rgba(52, 152, 219, 0.3)' : 
+                                powerup.type === 'speed' ? 'rgba(231, 76, 60, 0.3)' : 
+                                'rgba(155, 89, 182, 0.3)';
+                ctx.beginPath();
+                ctx.arc(
+                    powerup.x + powerup.width / 2,
+                    powerup.y + powerup.height / 2,
+                    powerup.width / 2 + pulseSize,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+                
+                // Ekran dışına çıkan güç kutularını kaldır
+                if (powerup.y > canvas.height) {
+                    powerups.splice(i, 1);
+                }
+            }
+        }
+        
+        function updateBullets() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                bullet.y -= bullet.speed;
+                
+                // Mermiyi çiz
+                ctx.fillStyle = bullet.color;
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                
+                // Mermi kuyruk efekti
+                ctx.fillStyle = bullet.color === '#3498db' ? 'rgba(52, 152, 219, 0.5)' : 
+                              bullet.color === '#9b59b6' ? 'rgba(155, 89, 182, 0.5)' : 
+                              'rgba(255, 200, 0, 0.5)';
+                ctx.fillRect(bullet.x - 1, bullet.y + bullet.height, bullet.width + 2, 8);
+                
+                // Ekran dışına çıkan mermileri kaldır
+                if (bullet.y + bullet.height < 0) {
+                    bullets.splice(i, 1);
+                }
+            }
+        }
+        
+        function checkCollisions() {
+            // Mermi-göktaşı çarpışması
+            for (let i = meteors.length - 1; i >= 0; i--) {
+                const meteor = meteors[i];
+                
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    const bullet = bullets[j];
+                    
+                    if (
+                        bullet.x < meteor.x + meteor.width &&
+                        bullet.x + bullet.width > meteor.x &&
+                        bullet.y < meteor.y + meteor.height &&
+                        bullet.y + bullet.height > meteor.y
+                    ) {
+                        // Çarpışma oldu
+                        meteor.health--;
+                        bullets.splice(j, 1);
+                        
+                        if (meteor.health <= 0) {
+                            createExplosion(meteor.x + meteor.width / 2, meteor.y + meteor.height / 2, meteor.width / 2);
+                            meteors.splice(i, 1);
+                            score += 10;
+                        } else {
+                            // Hasar aldı ama yok olmadı
+                            createExplosion(
+                                bullet.x + bullet.width / 2,
+                                bullet.y + bullet.height / 2,
+                                10,
+                                false
+                            );
+                        }
+                        
+                        updateUI();
+                        break;
+                    }
+                }
+            }
+            
+            // Jet-göktaşı çarpışması
+            for (let i = meteors.length - 1; i >= 0; i--) {
+                const meteor = meteors[i];
+                
+                if (
+                    jet.x < meteor.x + meteor.width &&
+                    jet.x + jet.width > meteor.x &&
+                    jet.y < meteor.y + meteor.height &&
+                    jet.y + jet.height > meteor.y
+                ) {
+                    // Çarpışma oldu
+                    createExplosion(meteor.x + meteor.width / 2, meteor.y + meteor.height / 2, meteor.width / 2);
+                    createExplosion(jet.x + jet.width / 2, jet.y + jet.height / 2, jet.width / 2);
+                    meteors.splice(i, 1);
+                    health -= 20;
+                    updateUI();
+                    
+                    if (health <= 0) {
+                        lives--;
+                        health = 100;
+                        if (lives <= 0) {
+                            gameOverEffect = true;
+                            gameOverTimer = 0;
+                        }
+                    }
+                }
+            }
+            
+            // Klon jet-göktaşı çarpışması
+            if (cloneJet) {
+                for (let i = meteors.length - 1; i >= 0; i--) {
+                    const meteor = meteors[i];
+                    
+                    if (
+                        cloneJet.x < meteor.x + meteor.width &&
+                        cloneJet.x + jet.width > meteor.x &&
+                        cloneJet.y < meteor.y + meteor.height &&
+                        cloneJet.y + jet.height > meteor.y
+                    ) {
+                        // Çarpışma oldu
+                        createExplosion(meteor.x + meteor.width / 2, meteor.y + meteor.height / 2, meteor.width / 2);
+                        meteors.splice(i, 1);
+                    }
+                }
+            }
+            
+            // Jet-güç kutusu çarpışması
+            for (let i = powerups.length - 1; i >= 0; i--) {
+                const powerup = powerups[i];
+                
+                if (
+                    jet.x < powerup.x + powerup.width &&
+                    jet.x + jet.width > powerup.x &&
+                    jet.y < powerup.y + powerup.height &&
+                    jet.y + jet.height > powerup.y
+                ) {
+                    // Güç kutusu toplandı
+                    applyPowerup(powerup.type);
+                    powerups.splice(i, 1);
+                    
+                    // Toplama efekti
+                    createExplosion(
+                        powerup.x + powerup.width / 2,
+                        powerup.y + powerup.height / 2,
+                        20,
+                        false,
+                        powerup.type === 'health' ? '#2ecc71' : 
+                        powerup.type === 'clone' ? '#3498db' : 
+                        powerup.type === 'speed' ? '#e74c3c' : '#9b59b6'
+                    );
+                }
+            }
+        }
+        
+        function applyPowerup(type) {
+            const now = Date.now();
+            powerupActive = type;
+            powerupEndTime = now + (type === 'health' ? 0 : 
+                                  type === 'clone' ? 10000 : 
+                                  type === 'speed' ? 8000 : 12000);
+            
+            switch(type) {
+                case 'health':
+                    lives = Math.min(3, lives + 1);
+                    health = 100;
+                    powerupActive = null;
+                    break;
+                    
+                case 'clone':
+                    cloneJet = {
+                        x: jet.x - 50 + Math.random() * 100,
+                        y: jet.y - 30,
+                        lastShot: now
+                    };
+                    break;
+                    
+                case 'speed':
+                    jet.speed = jet.baseSpeed * 1.8;
+                    break;
+                    
+                case 'double':
+                    // Çift ateş zaten shootBullet fonksiyonunda işleniyor
+                    break;
+            }
+            
+            updateUI();
+        }
+        
+        function updatePowerTimer(timestamp) {
+            if (!powerupActive || powerupActive === 'health') return;
+            
+            if (timestamp > powerupEndTime) {
+                // Güç süresi doldu
+                switch(powerupActive) {
+                    case 'clone':
+                        cloneJet = null;
+                        break;
+                        
+                    case 'speed':
+                        jet.speed = jet.baseSpeed;
+                        break;
+                        
+                    case 'double':
+                        // Çift ateş sona erdi
+                        break;
+                }
+                
+                powerupActive = null;
+                document.getElementById('powerup').textContent = 'Yok';
+            } else {
+                // Kalan süreyi göster
+                const remaining = Math.ceil((powerupEndTime - timestamp) / 1000);
+                document.getElementById('powerup').textContent = 
+                    powerupActive === 'clone' ? `Klon (${remaining}s)` :
+                    powerupActive === 'speed' ? `Hız Artışı (${remaining}s)` :
+                    powerupActive === 'double' ? `Çift Ateş (${remaining}s)` : '';
+            }
+        }
+        
+        function createExplosion(x, y, size, showDamage = true, color = null) {
+            explosions.push({
+                x: x,
+                y: y,
+                size: size,
+                particles: [],
+                createdAt: Date.now(),
+                duration: 700,
+                showDamage: showDamage,
+                color: color
+            });
+            
+            // Patlama parçacıkları oluştur
+            const particleCount = size * 3;
+            for (let i = 0; i < particleCount; i++) {
+                const baseColor = color || `hsl(${Math.random() * 60 + 10}, 100%, 50%)`;
+                
+                explosions[explosions.length - 1].particles.push({
+                    x: x,
+                    y: y,
+                    radius: Math.random() * 5 + 2,
+                    color: baseColor,
+                    speedX: (Math.random() - 0.5) * 10,
+                    speedY: (Math.random() - 0.5) * 10,
+                    life: 50 + Math.random() * 50
+                });
+            }
+        }
+        
+        function updateExplosions(timestamp) {
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                const explosion = explosions[i];
+                const progress = (timestamp - explosion.createdAt) / explosion.duration;
+                
+                if (progress >= 1) {
+                    explosions.splice(i, 1);
+                    continue;
+                }
+                
+                // Hasar yazısı
+                if (explosion.showDamage) {
+                    ctx.fillStyle = `rgba(255, 50, 50, ${1 - progress})`;
+                    ctx.font = 'bold 16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`-20`, explosion.x, explosion.y - 30 - progress * 20);
+                }
+                
+                // Parçacıkları güncelle ve çiz
+                for (const particle of explosion.particles) {
+                    particle.x += particle.speedX;
+                    particle.y += particle.speedY;
+                    particle.life--;
+                    
+                    const alpha = Math.min(1, particle.life / 50);
+                    ctx.fillStyle = particle.color.replace('%)', `%, ${alpha})`);
+                    
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Alev efekti
+                    if (Math.random() < 0.3) {
+                        const flameColor = explosion.color ? 
+                                          explosion.color.replace(')', `, ${alpha * 0.5})`) : 
+                                          `rgba(255, ${Math.random() * 100 + 100}, 0, ${alpha * 0.5})`;
+                        ctx.fillStyle = flameColor;
+                        ctx.beginPath();
+                        ctx.arc(
+                            particle.x + (Math.random() - 0.5) * 10,
+                            particle.y + (Math.random() - 0.5) * 10,
+                            particle.radius * 1.5,
+                            0,
+                            Math.PI * 2
+                        );
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+        
+        function updateUI() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('lives').textContent = lives;
+            healthFill.style.width = `${health}%`;
+            
+            // Can azaldıkça rengi kırmızıya döner
+            if (health > 60) {
+                healthFill.style.background = 'linear-gradient(to right, #4CAF50, #8BC34A)';
+            } else if (health > 30) {
+                healthFill.style.background = 'linear-gradient(to right, #FFC107, #FF9800)';
+            } else {
+                healthFill.style.background = 'linear-gradient(to right, #F44336, #FF5722)';
+            }
+        }
+        
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationFrameId);
+            
+            startScreen.style.display = 'flex';
+            const p = startScreen.querySelector('p');
+            p.innerHTML = `<span class="game-over">OYUN BİTTİ!</span><br>Skorunuz: <strong>${score}</strong>`;
+            startButton.textContent = 'TEKRAR DENE';
+        }
+    </script>
+</body>
+</html>

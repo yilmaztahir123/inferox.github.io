@@ -12,6 +12,7 @@
             overflow: hidden;
             font-family: 'Arial', sans-serif;
             touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
         }
         #gameCanvas {
             display: block;
@@ -28,6 +29,8 @@
             top: 0;
             width: 100%;
             box-sizing: border-box;
+            pointer-events: none;
+            z-index: 2;
         }
         #startScreen {
             position: absolute;
@@ -55,6 +58,11 @@
             font-weight: bold;
             text-shadow: 1px 1px 2px #000;
             box-shadow: 0 0 15px rgba(238, 168, 73, 0.7);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        #startButton:active {
+            transform: scale(0.95);
+            box-shadow: 0 0 10px rgba(238, 168, 73, 0.5);
         }
         #controls {
             margin-top: 20px;
@@ -103,6 +111,7 @@
             padding: 0 20px;
             box-sizing: border-box;
             z-index: 5;
+            touch-action: manipulation;
         }
         .mobile-btn {
             width: 60px;
@@ -116,6 +125,10 @@
             font-size: 24px;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        .mobile-btn:active {
+            background-color: rgba(255, 255, 255, 0.4);
         }
         #fireBtn {
             position: absolute;
@@ -125,6 +138,9 @@
             width: 80px;
             height: 80px;
         }
+        #fireBtn:active {
+            background-color: rgba(255, 0, 0, 0.5);
+        }
         .powerup-tag {
             display: inline-block;
             padding: 2px 8px;
@@ -132,6 +148,27 @@
             border-radius: 10px;
             margin-left: 5px;
             font-size: 12px;
+        }
+        #joystick {
+            position: absolute;
+            left: 30px;
+            bottom: 30px;
+            width: 100px;
+            height: 100px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            display: none;
+            z-index: 6;
+        }
+        #joystickKnob {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            top: 30px;
+            left: 30px;
+            transition: transform 0.1s;
         }
     </style>
 </head>
@@ -144,22 +181,21 @@
     <canvas id="gameCanvas"></canvas>
     
     <div id="mobileControls">
-        <div id="leftBtn" class="mobile-btn">←</div>
-        <div id="rightBtn" class="mobile-btn">→</div>
-        <div id="upBtn" class="mobile-btn">↑</div>
-        <div id="downBtn" class="mobile-btn">↓</div>
+        <div id="joystick">
+            <div id="joystickKnob"></div>
+        </div>
+        <div id="fireBtn" class="mobile-btn">🔫</div>
     </div>
-    <div id="fireBtn" class="mobile-btn">🔫</div>
     
     <div id="startScreen">
         <div class="title">JET SAVAŞI</div>
-        <p>Göktaşlarını yok et ve uzayı koru!</p>
+        <p>Düşman ateş toplarını yok et ve galaksimizi koru!</p>
         <div id="controls">
-            <strong>ÖZEL GÜÇLER:</strong><br>
-            <span style="color:#2ecc71">Yeşil Kutu</span> - +1 Can<br>
-            <span style="color:#3498db">Mavi Kutu</span> - Klonlanma (10s)<br>
-            <span style="color:#e74c3c">Kırmızı Kutu</span> - Hız Artışı (8s)<br>
-            <span style="color:#9b59b6">Mor Kutu</span> - Çift Ateş (12s)
+            <strong>ÖZEL İKSİRLER:</strong><br>
+            <span style="color:#2ecc71">Yeşil İksir</span> - +1 Can<br>
+            <span style="color:#3498db">Mavi İksir</span> - Klonlanma (10s)<br>
+            <span style="color:#e74c3c">Kırmızı İksir</span> - Hız Artışı (8s)<br>
+            <span style="color:#9b59b6">Mor İksir</span> - Üçlü Ateş (12s)
         </div>
         <button id="startButton">OYUNA BAŞLA</button>
     </div>
@@ -178,34 +214,35 @@
         
         window.addEventListener('resize', resizeCanvas);
         
-        // Resimler
+        // Resimler - Optimize edilmiş SVG tabanlı görseller
         const jetImg = new Image();
-        jetImg.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cGF0aCBkPSJNODAgNTBMNTAgODBMNTAgNzBMNjAgNTBMNTAgMzBMNTAgMjBMODAgNTBaIiBmaWxsPSIjMzQ5OGRiIiBzdHJva2U9IiMyYzNlNTAiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ9Ik0yMCA1MEw1MCAyMEw1MCAzMEw0MCA1MEw1MCA3MEw1MCA4MEwyMCA1MFoiIGZpbGw9IiMzNDk4ZGIiIHN0cm9rZT0iIzJjM2U1MCIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTUwIDQ1TDUwIDU1TTQwIDUwTDYwIDUwIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMiIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjE1IiBmaWxsPSIjMmMzZTUwIi8+PC9zdmc+';
+        jetImg.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cGF0aCBkPSJNNTAgMTBDNzAgMTUgODAgMzAgNzAgNTBMOTAgNTBMNTAgOTBMMTAgNTBMMzAgNTBDMjAgMzAgMzAgMTUgNTAgMTBaIiBmaWxsPSIjMDA3N0ZGIiBzdHJva2U9IiMwMDU1QkIiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ9Ik0zMCA1MEg3MCIgc3Ryb2tlPSIjMDA1NUJCIiBzdHJva2Utd2lkdGg9IjQiLz48cGF0aCBkPSJNNDAgNTBMNTAgNzBNNjAgNTBMNTAgNzAiIHN0cm9rZT0iIzAwOTlGRiIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTQ1IDQ1TDUwIDUwTDU1IDQ1IiBzdHJva2U9IiNGRkYiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==';
         
-        const meteorImgs = [
-            'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIGZpbGw9IiM3ODVhNjMiLz48cGF0aCBkPSJNMzAgMjBDNTAgNDAgNDAgNzAgNTAgODBDNjAgNzAgNTAgNDAgMzAgMjBaIiBmaWxsPSIjOWNjN2MxIiBzdHJva2U9IiM2NzQyMjEiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ9Ik0yMCAzMEMxMCA0MCAwIDYwIDIwIDcwQzMwIDgwIDUwIDYwIDYwIDUwQzcwIDQwIDUwIDIwIDQwIDMwQzMwIDQwIDIwIDIwIDIwIDMwWiIgZmlsbD0iI2IzOGMxZCIgc3Ryb2tlPSIjODU1ODFkIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4=',
-            'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIGZpbGw9IiM1ZDhjYzAiLz48cGF0aCBkPSJNMzAgMTVDNTAgMzUgNDAgNjAgNTAgNzBDNjAgNjAgNTAgMzUgMzAgMTVaIiBmaWxsPSIjOGNiZmE1IiBzdHJva2U9IiMzZDc5YjEiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ9Ik0yMCAyNUMxMCAzNSAwIDU1IDIwIDY1QzMwIDc1IDUwIDU1IDYwIDQ1QzcwIDM1IDUwIDE1IDQwIDI1QzMwIDM1IDIwIDE1IDIwIDI1WiIgZmlsbD0iI2I5ZTRkMyIgc3Ryb2tlPSIjN2NiY2UwIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4=',
-            'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIGZpbGw9IiNjMzkzNTUiLz48cGF0aCBkPSJNMzAgMTVDNTAgMzUgNDAgNjAgNTAgNzBDNjAgNjAgNTAgMzUgMzAgMTVaIiBmaWxsPSIjZTc3YzdjIiBzdHJva2U9IiNhNTI4MmIiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ9Ik0yMCAyNUMxMCAzNSAwIDU1IDIwIDY1QzMwIDc1IDUwIDU1IDYwIDQ1QzcwIDM1IDUwIDE1IDQwIDI1QzMwIDM1IDIwIDE1IDIwIDI1WiIgZmlsbD0iI2Y4YmNjNSIgc3Ryb2tlPSIjZDY1YTVkIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4='
+        const enemyFireImgs = [
+            'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0idXJsKCNmaXJlR3JhZGllbnQpIi8+PGRlZnM+PHJhZGlhbEdyYWRpZW50IGlkPSJmaXJlR3JhZGllbnQiIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNGRjkwMDAiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNGRjAwMDAiLz48L3JhZGlhbEdyYWRpZW50PjwvZGVmcz48L3N2Zz4=',
+            'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48ZWxsaXBzZSBjeD0iNTAiIGN5PSI1MCIgcng9IjQwIiByeT0iMzAiIGZpbGw9InVybCgjZmlyZUdyYWRpZW50KSIgdHJhbnNmb3JtPSJyb3RhdGUoLTMwIDUwIDUwKSIvPjxkZWZzPjxyYWRpYWxHcmFkaWVudCBpZD0iZmlyZUdyYWRpZW50IiBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjRkY5MDAwIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjRkYwMDAwIi8+PC9yYWRpYWxHcmFkaWVudD48L2RlZnM+PC9zdmc+',
+            'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cGF0aCBkPSJNNTAgMTBDNzAgMTUgODAgMzAgNzAgNTBMOTAgNTBMNTAgOTBMMTAgNTBMMzAgNTBDMjAgMzAgMzAgMTUgNTAgMTBaIiBmaWxsPSJ1cmwoI2ZpcmVHcmFkaWVudCkiIHRyYW5zZm9ybT0icm90YXRlKDMwIDUwIDUwKSIvPjxkZWZzPjxyYWRpYWxHcmFkaWVudCBpZD0iZmlyZUdyYWRpZW50IiBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjRkY5MDAwIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjRkYwMDAwIi8+PC9yYWRpYWxHcmFkaWVudD48L2RlZnM+PC9zdmc+'
         ].map(src => {
             const img = new Image();
             img.src = src;
             return img;
         });
         
-        // Güç kutusu görselleri
+        // Güç kutusu görselleri (iksir şişeleri)
         const powerupImgs = {
-            health: createPowerupImage('#2ecc71'),
-            clone: createPowerupImage('#3498db'),
-            speed: createPowerupImage('#e74c3c'),
-            double: createPowerupImage('#9b59b6')
+            health: createPotionImage('#2ecc71'),
+            clone: createPotionImage('#3498db'),
+            speed: createPotionImage('#e74c3c'),
+            double: createPotionImage('#9b59b6')
         };
         
-        function createPowerupImage(color) {
+        function createPotionImage(color) {
             const img = new Image();
             img.src = `data:image/svg+xml;base64,${btoa(`
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
-                    <rect x="10" y="10" width="30" height="30" rx="5" fill="${color}"/>
-                    <rect x="15" y="15" width="20" height="20" rx="3" fill="white" opacity="0.3"/>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 100">
+                    <path d="M15 10H35V40C35 55 25 65 25 80C25 95 35 85 35 70V90H15V70C15 85 5 95 5 80C5 65 15 55 15 40V10Z" fill="${color}"/>
+                    <path d="M15 10H35V15H15V10Z" fill="#fff" opacity="0.5"/>
+                    <path d="M10 40C10 55 20 65 20 80C20 95 10 85 10 70V40Z" fill="#fff" opacity="0.2"/>
                 </svg>
             `)}`;
             return img;
@@ -219,15 +256,20 @@
         let animationFrameId;
         let gameOverEffect = false;
         let gameOverTimer = 0;
-        let lastMeteorSpawn = 0;
-        let meteorSpeed = 2;
-        let maxMeteorSpeed = 6;
-        let meteorSpawnRate = 1500;
+        let lastEnemyFireSpawn = 0;
+        let enemyFireSpeed = 2;
+        let maxEnemyFireSpeed = 8;
+        let enemyFireSpawnRate = 1500;
         let difficultyIncreaseInterval = 5000;
         let lastDifficultyIncrease = 0;
         let powerupActive = null;
         let powerupEndTime = 0;
         let cloneJet = null;
+        let joystickActive = false;
+        let joystickAngle = 0;
+        let joystickForce = 0;
+        let lastPowerupSpawn = 0;
+        let powerupSpawnInterval = 20000; // 20 saniyede bir güç kutusu
         
         // Jet özellikleri
         const jet = {
@@ -240,25 +282,27 @@
             img: jetImg,
             bullets: [],
             lastShot: 0,
-            shootDelay: 300,
-            engineParticles: []
+            shootDelay: 200, // Daha hızlı ateş
+            engineParticles: [],
+            shootAnimation: 0
         };
         
-        // Göktaşları
-        const meteors = [];
+        // Düşman ateş topları
+        const enemyFires = [];
         const powerups = [];
         const explosions = [];
         const bullets = [];
         
         // Yıldızlar arka plan için
         const stars = [];
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 150; i++) {
             stars.push({
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height,
-                size: Math.random() * 2 + 1,
-                speed: Math.random() * 0.5 + 0.1,
-                alpha: Math.random() * 0.5 + 0.5
+                size: Math.random() * 3 + 1,
+                speed: Math.random() * 0.8 + 0.2,
+                alpha: Math.random() * 0.7 + 0.3,
+                twinkle: Math.random() > 0.7
             });
         }
         
@@ -276,12 +320,17 @@
         };
         
         // Mobil kontroller
-        const mobileBtns = {
-            left: false,
-            right: false,
-            up: false,
-            down: false,
-            fire: false
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let isFiring = false;
+        
+        // Joystick için
+        const joystick = {
+            baseX: 0,
+            baseY: 0,
+            knobX: 0,
+            knobY: 0,
+            active: false
         };
         
         // Olay dinleyicileri
@@ -302,21 +351,103 @@
         });
         
         // Mobil kontroller
-        document.getElementById('leftBtn').addEventListener('touchstart', () => mobileBtns.left = true);
-        document.getElementById('leftBtn').addEventListener('touchend', () => mobileBtns.left = false);
-        document.getElementById('rightBtn').addEventListener('touchstart', () => mobileBtns.right = true);
-        document.getElementById('rightBtn').addEventListener('touchend', () => mobileBtns.right = false);
-        document.getElementById('upBtn').addEventListener('touchstart', () => mobileBtns.up = true);
-        document.getElementById('upBtn').addEventListener('touchend', () => mobileBtns.up = false);
-        document.getElementById('downBtn').addEventListener('touchstart', () => mobileBtns.down = true);
-        document.getElementById('downBtn').addEventListener('touchend', () => mobileBtns.down = false);
-        document.getElementById('fireBtn').addEventListener('touchstart', () => {
-            mobileBtns.fire = true;
-            if (gameRunning) shootBullet();
-        });
-        document.getElementById('fireBtn').addEventListener('touchend', () => mobileBtns.fire = false);
+        function setupMobileControls() {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const fireBtn = document.getElementById('fireBtn');
+            
+            if (isMobile) {
+                // Joystick için dokunma olayları
+                document.addEventListener('touchstart', handleTouchStart, { passive: false });
+                document.addEventListener('touchmove', handleTouchMove, { passive: false });
+                document.addEventListener('touchend', handleTouchEnd, { passive: false });
+                
+                // Ateş butonu
+                fireBtn.style.display = 'flex';
+                fireBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    isFiring = true;
+                    if (gameRunning) shootBullet();
+                });
+                fireBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    isFiring = false;
+                });
+            } else {
+                fireBtn.style.display = 'none';
+            }
+        }
         
-        startButton.addEventListener('click', startGame);
+        function handleTouchStart(e) {
+            if (!gameRunning) return;
+            
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            
+            // Joystick alanı (sol alt köşe)
+            const joystickArea = {
+                left: 0,
+                top: canvas.height - 150,
+                right: 150,
+                bottom: canvas.height
+            };
+            
+            if (touch.clientX < joystickArea.right && touch.clientY > joystickArea.top) {
+                joystick.active = true;
+                joystick.baseX = touch.clientX;
+                joystick.baseY = touch.clientY;
+                joystick.knobX = touch.clientX;
+                joystick.knobY = touch.clientY;
+                
+                // Joystick görünür yap
+                const joystickElement = document.getElementById('joystick');
+                joystickElement.style.display = 'block';
+                joystickElement.style.left = (joystick.baseX - 50) + 'px';
+                joystickElement.style.bottom = (canvas.height - joystick.baseY + 50) + 'px';
+            }
+        }
+        
+        function handleTouchMove(e) {
+            if (!gameRunning || !joystick.active) return;
+            
+            e.preventDefault();
+            const touch = e.touches[0];
+            
+            // Joystick hareketi
+            const dx = touch.clientX - joystick.baseX;
+            const dy = touch.clientY - joystick.baseY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const maxDistance = 50;
+            
+            if (distance < maxDistance) {
+                joystick.knobX = touch.clientX;
+                joystick.knobY = touch.clientY;
+            } else {
+                const angle = Math.atan2(dy, dx);
+                joystick.knobX = joystick.baseX + Math.cos(angle) * maxDistance;
+                joystick.knobY = joystick.baseY + Math.sin(angle) * maxDistance;
+            }
+            
+            // Joystick knob pozisyonunu güncelle
+            const knobElement = document.getElementById('joystickKnob');
+            knobElement.style.transform = `translate(${joystick.knobX - joystick.baseX}px, ${joystick.knobY - joystick.baseY}px)`;
+            
+            // Açı ve kuvvet hesapla
+            joystickAngle = Math.atan2(joystick.knobY - joystick.baseY, joystick.knobX - joystick.baseX);
+            joystickForce = Math.min(1, distance / maxDistance);
+        }
+        
+        function handleTouchEnd(e) {
+            if (!gameRunning) return;
+            
+            // Joystick'i sıfırla
+            joystick.active = false;
+            joystickForce = 0;
+            document.getElementById('joystick').style.display = 'none';
+            document.getElementById('joystickKnob').style.transform = 'translate(0, 0)';
+        }
+        
+        document.getElementById('startButton').addEventListener('click', startGame);
         
         // Oyun fonksiyonları
         function startGame() {
@@ -327,7 +458,7 @@
             updateUI();
             gameRunning = true;
             gameOverEffect = false;
-            meteors.length = 0;
+            enemyFires.length = 0;
             powerups.length = 0;
             explosions.length = 0;
             bullets.length = 0;
@@ -335,15 +466,20 @@
             jet.engineParticles.length = 0;
             powerupActive = null;
             cloneJet = null;
-            meteorSpeed = 2;
-            maxMeteorSpeed = 6;
-            meteorSpawnRate = 1500;
+            enemyFireSpeed = 2;
+            maxEnemyFireSpeed = 8;
+            enemyFireSpawnRate = 1500;
             lastDifficultyIncrease = Date.now();
+            lastPowerupSpawn = Date.now();
             
             // Jet başlangıç pozisyonu
             jet.x = canvas.width / 2;
             jet.y = canvas.height - 100;
             jet.speed = jet.baseSpeed;
+            jet.shootAnimation = 0;
+            
+            // Mobil kontrolleri ayarla
+            setupMobileControls();
             
             // Oyun döngüsünü başlat
             gameLoop();
@@ -364,6 +500,12 @@
                 lastDifficultyIncrease = timestamp;
             }
             
+            // Güç kutusu spawn
+            if (timestamp - lastPowerupSpawn > powerupSpawnInterval && powerups.length < 1) {
+                spawnPowerup();
+                lastPowerupSpawn = timestamp;
+            }
+            
             // Jet hareketi
             updateJet(timestamp);
             
@@ -372,19 +514,14 @@
                 updateCloneJet(timestamp);
             }
             
-            // Göktaşı spawn
-            if (timestamp - lastMeteorSpawn > meteorSpawnRate) {
-                spawnMeteor();
-                lastMeteorSpawn = timestamp;
+            // Düşman ateş topu spawn
+            if (timestamp - lastEnemyFireSpawn > enemyFireSpawnRate) {
+                spawnEnemyFire();
+                lastEnemyFireSpawn = timestamp;
             }
             
-            // Güç kutusu spawn (rastgele)
-            if (Math.random() < 0.005 && powerups.length < 2) {
-                spawnPowerup();
-            }
-            
-            // Göktaşlarını güncelle
-            updateMeteors();
+            // Düşman ateş toplarını güncelle
+            updateEnemyFires();
             
             // Güç kutularını güncelle
             updatePowerups();
@@ -415,17 +552,34 @@
                     gameOver();
                 }
             }
+            
+            // Sürekli ateş için
+            if (isFiring && timestamp - jet.lastShot > jet.shootDelay) {
+                shootBullet();
+                jet.lastShot = timestamp;
+            }
+            
+            // Ateş animasyonunu güncelle
+            if (jet.shootAnimation > 0) {
+                jet.shootAnimation -= 2;
+            }
         }
         
         function drawBackground() {
             // Uzay arka planı
-            ctx.fillStyle = '#000';
+            ctx.fillStyle = '#000033';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             // Yıldızlar
             for (const star of stars) {
+                if (star.twinkle) {
+                    star.alpha = 0.3 + Math.abs(Math.sin(Date.now() / 500 + star.x)) * 0.7;
+                }
+                
                 ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
-                ctx.fillRect(star.x, star.y, star.size, star.size);
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size / 2, 0, Math.PI * 2);
+                ctx.fill();
                 
                 // Hareket efekti
                 star.y += star.speed;
@@ -437,21 +591,28 @@
         }
         
         function increaseDifficulty() {
-            if (meteorSpeed < maxMeteorSpeed) {
-                meteorSpeed = Math.min(maxMeteorSpeed, meteorSpeed + 0.3);
+            if (enemyFireSpeed < maxEnemyFireSpeed) {
+                enemyFireSpeed = Math.min(maxEnemyFireSpeed, enemyFireSpeed + 0.3);
             }
             
-            if (meteorSpawnRate > 600) {
-                meteorSpawnRate -= 100;
+            if (enemyFireSpawnRate > 600) {
+                enemyFireSpawnRate -= 100;
             }
         }
         
         function updateJet(timestamp) {
             // Hareket (klavye)
-            if (keys.ArrowUp || keys.w || mobileBtns.up) jet.y -= jet.speed;
-            if (keys.ArrowDown || keys.s || mobileBtns.down) jet.y += jet.speed;
-            if (keys.ArrowLeft || keys.a || mobileBtns.left) jet.x -= jet.speed;
-            if (keys.ArrowRight || keys.d || mobileBtns.right) jet.x += jet.speed;
+            if (keys.ArrowUp || keys.w) jet.y -= jet.speed;
+            if (keys.ArrowDown || keys.s) jet.y += jet.speed;
+            if (keys.ArrowLeft || keys.a) jet.x -= jet.speed;
+            if (keys.ArrowRight || keys.d) jet.x += jet.speed;
+            
+            // Hareket (joystick)
+            if (joystick.active && joystickForce > 0.1) {
+                const speed = jet.speed * joystickForce;
+                jet.x += Math.cos(joystickAngle) * speed;
+                jet.y += Math.sin(joystickAngle) * speed;
+            }
             
             // Sınır kontrolü
             jet.x = Math.max(0, Math.min(canvas.width - jet.width, jet.x));
@@ -459,7 +620,7 @@
             
             // Motor partikülleri
             if (gameRunning && !gameOverEffect) {
-                if (Math.random() < 0.5) {
+                if (Math.random() < 0.7) {
                     jet.engineParticles.push({
                         x: jet.x + jet.width / 2 + (Math.random() - 0.5) * 10,
                         y: jet.y + jet.height,
@@ -488,9 +649,20 @@
             
             // Hareket yönüne göre hafif döndürme
             let angle = 0;
-            if ((keys.ArrowLeft || keys.a || mobileBtns.left) && !(keys.ArrowRight || keys.d || mobileBtns.right)) angle = -0.2;
-            if ((keys.ArrowRight || keys.d || mobileBtns.right) && !(keys.ArrowLeft || keys.a || mobileBtns.left)) angle = 0.2;
+            if ((keys.ArrowLeft || keys.a || (joystick.active && joystickAngle < -Math.PI/4 && joystickAngle > -3*Math.PI/4)) && 
+                !(keys.ArrowRight || keys.d || (joystick.active && joystickAngle > Math.PI/4 && joystickAngle < 3*Math.PI/4))) {
+                angle = -0.2;
+            }
+            if ((keys.ArrowRight || keys.d || (joystick.active && joystickAngle > Math.PI/4 && joystickAngle < 3*Math.PI/4)) && 
+                !(keys.ArrowLeft || keys.a || (joystick.active && joystickAngle < -Math.PI/4 && joystickAngle > -3*Math.PI/4))) {
+                angle = 0.2;
+            }
             ctx.rotate(angle);
+            
+            // Ateş animasyonu
+            if (jet.shootAnimation > 0) {
+                ctx.translate(0, jet.shootAnimation);
+            }
             
             ctx.drawImage(jet.img, -jet.width / 2, -jet.height / 2, jet.width, jet.height);
             ctx.restore();
@@ -501,12 +673,19 @@
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
                 ctx.fill();
+                
+                // Alev efekti
+                ctx.fillStyle = p.color.replace('%)', `%, 0.5)`);
+                ctx.beginPath();
+                ctx.arc(p.x, p.y + p.size, p.size * 1.5, 0, Math.PI * 2);
+                ctx.fill();
             }
             
             // Ateş butonuna basılıysa ateş et
-            if ((keys[' '] || mobileBtns.fire) && timestamp - jet.lastShot > jet.shootDelay) {
+            if ((keys[' '] || isFiring) && timestamp - jet.lastShot > jet.shootDelay) {
                 shootBullet();
                 jet.lastShot = timestamp;
+                jet.shootAnimation = 10;
             }
         }
         
@@ -533,53 +712,57 @@
         }
         
         function shootBullet() {
-            // Normal mermi
+            // Normal mermi (lazer efekti)
             bullets.push({
                 x: jet.x + jet.width / 2 - 2.5,
                 y: jet.y,
                 width: 5,
                 height: 15,
-                speed: 10,
-                color: '#f1c40f'
+                speed: 12,
+                color: '#00ffff',
+                trail: []
             });
             
-            // Çift ateş aktifse ek mermi
+            // Üçlü ateş aktifse ek mermiler
             if (powerupActive === 'double') {
                 bullets.push({
-                    x: jet.x + jet.width / 2 - 15,
+                    x: jet.x + jet.width / 2 - 20,
                     y: jet.y + 10,
                     width: 5,
                     height: 15,
-                    speed: 10,
-                    color: '#9b59b6'
+                    speed: 12,
+                    color: '#9b59b6',
+                    trail: []
                 });
                 bullets.push({
-                    x: jet.x + jet.width / 2 + 10,
+                    x: jet.x + jet.width / 2 + 15,
                     y: jet.y + 10,
                     width: 5,
                     height: 15,
-                    speed: 10,
-                    color: '#9b59b6'
+                    speed: 12,
+                    color: '#9b59b6',
+                    trail: []
                 });
             }
             
             jet.lastShot = Date.now();
         }
         
-        function spawnMeteor() {
+        function spawnEnemyFire() {
             const size = 30 + Math.random() * 40;
-            const type = Math.floor(Math.random() * meteorImgs.length);
-            meteors.push({
+            const type = Math.floor(Math.random() * enemyFireImgs.length);
+            enemyFires.push({
                 x: Math.random() * (canvas.width - size),
                 y: -size,
                 width: size,
                 height: size,
-                speed: meteorSpeed + Math.random() * 2,
+                speed: enemyFireSpeed + Math.random() * 2,
                 type: type,
-                img: meteorImgs[type],
+                img: enemyFireImgs[type],
                 rotation: Math.random() * Math.PI * 2,
                 rotationSpeed: (Math.random() - 0.5) * 0.05,
-                health: 1 + Math.floor(size / 20) // Büyük göktaşları daha dayanıklı
+                health: 1 + Math.floor(size / 20), // Büyük toplar daha dayanıklı
+                pulse: 0
             });
         }
         
@@ -601,29 +784,33 @@
                 x: Math.random() * (canvas.width - 30),
                 y: -30,
                 width: 30,
-                height: 30,
+                height: 50, // İksir şişeleri daha uzun
                 speed: 2,
                 type: selectedType,
-                img: powerupImgs[selectedType]
+                img: powerupImgs[selectedType],
+                rotation: 0,
+                rotationSpeed: (Math.random() - 0.5) * 0.02
             });
         }
         
-        function updateMeteors() {
-            for (let i = meteors.length - 1; i >= 0; i--) {
-                const meteor = meteors[i];
-                meteor.y += meteor.speed;
-                meteor.rotation += meteor.rotationSpeed;
+        function updateEnemyFires() {
+            for (let i = enemyFires.length - 1; i >= 0; i--) {
+                const fire = enemyFires[i];
+                fire.y += fire.speed;
+                fire.rotation += fire.rotationSpeed;
+                fire.pulse = Math.sin(Date.now() / 200) * 0.2 + 1;
                 
-                // Göktaşını çiz
+                // Ateş topunu çiz
                 ctx.save();
-                ctx.translate(meteor.x + meteor.width / 2, meteor.y + meteor.height / 2);
-                ctx.rotate(meteor.rotation);
-                ctx.drawImage(meteor.img, -meteor.width / 2, -meteor.height / 2, meteor.width, meteor.height);
+                ctx.translate(fire.x + fire.width / 2, fire.y + fire.height / 2);
+                ctx.rotate(fire.rotation);
+                ctx.scale(fire.pulse, fire.pulse);
+                ctx.drawImage(fire.img, -fire.width / 2, -fire.height / 2, fire.width, fire.height);
                 ctx.restore();
                 
-                // Ekran dışına çıkan göktaşlarını kaldır
-                if (meteor.y > canvas.height) {
-                    meteors.splice(i, 1);
+                // Ekran dışına çıkan ateş toplarını kaldır
+                if (fire.y > canvas.height) {
+                    enemyFires.splice(i, 1);
                 }
             }
         }
@@ -632,16 +819,21 @@
             for (let i = powerups.length - 1; i >= 0; i--) {
                 const powerup = powerups[i];
                 powerup.y += powerup.speed;
+                powerup.rotation += powerup.rotationSpeed;
                 
-                // Güç kutusunu çiz
-                ctx.drawImage(powerup.img, powerup.x, powerup.y, powerup.width, powerup.height);
+                // İksiri çiz
+                ctx.save();
+                ctx.translate(powerup.x + powerup.width / 2, powerup.y + powerup.height / 2);
+                ctx.rotate(powerup.rotation);
+                ctx.drawImage(powerup.img, -powerup.width / 2, -powerup.height / 2, powerup.width, powerup.height);
+                ctx.restore();
                 
                 // Parlama efekti
-                const pulseSize = Math.sin(Date.now() / 200) * 5 + 5;
-                ctx.fillStyle = powerup.type === 'health' ? 'rgba(46, 204, 113, 0.3)' : 
-                                powerup.type === 'clone' ? 'rgba(52, 152, 219, 0.3)' : 
-                                powerup.type === 'speed' ? 'rgba(231, 76, 60, 0.3)' : 
-                                'rgba(155, 89, 182, 0.3)';
+                const pulseSize = Math.sin(Date.now() / 300) * 5 + 10;
+                ctx.fillStyle = powerup.type === 'health' ? 'rgba(46, 204, 113, 0.2)' : 
+                                powerup.type === 'clone' ? 'rgba(52, 152, 219, 0.2)' : 
+                                powerup.type === 'speed' ? 'rgba(231, 76, 60, 0.2)' : 
+                                'rgba(155, 89, 182, 0.2)';
                 ctx.beginPath();
                 ctx.arc(
                     powerup.x + powerup.width / 2,
@@ -652,7 +844,7 @@
                 );
                 ctx.fill();
                 
-                // Ekran dışına çıkan güç kutularını kaldır
+                // Ekran dışına çıkan iksirleri kaldır
                 if (powerup.y > canvas.height) {
                     powerups.splice(i, 1);
                 }
@@ -664,15 +856,28 @@
                 const bullet = bullets[i];
                 bullet.y -= bullet.speed;
                 
-                // Mermiyi çiz
-                ctx.fillStyle = bullet.color;
+                // Mermi kuyruğuna pozisyon ekle (en fazla 5)
+                bullet.trail.unshift({x: bullet.x + bullet.width/2, y: bullet.y + bullet.height});
+                if (bullet.trail.length > 5) bullet.trail.pop();
+                
+                // Mermiyi çiz (lazer efekti)
+                const gradient = ctx.createLinearGradient(bullet.x, bullet.y, bullet.x, bullet.y + bullet.height);
+                gradient.addColorStop(0, bullet.color);
+                gradient.addColorStop(1, 'rgba(0,255,255,0)');
+                
+                ctx.fillStyle = gradient;
                 ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
                 
                 // Mermi kuyruk efekti
-                ctx.fillStyle = bullet.color === '#3498db' ? 'rgba(52, 152, 219, 0.5)' : 
-                              bullet.color === '#9b59b6' ? 'rgba(155, 89, 182, 0.5)' : 
-                              'rgba(255, 200, 0, 0.5)';
-                ctx.fillRect(bullet.x - 1, bullet.y + bullet.height, bullet.width + 2, 8);
+                for (let j = 0; j < bullet.trail.length; j++) {
+                    const alpha = 1 - (j / bullet.trail.length);
+                    const size = bullet.width * (1 - j / bullet.trail.length);
+                    
+                    ctx.fillStyle = bullet.color.replace(')', `, ${alpha})`);
+                    ctx.beginPath();
+                    ctx.arc(bullet.trail[j].x, bullet.trail[j].y, size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
                 
                 // Ekran dışına çıkan mermileri kaldır
                 if (bullet.y + bullet.height < 0) {
@@ -682,27 +887,27 @@
         }
         
         function checkCollisions() {
-            // Mermi-göktaşı çarpışması
-            for (let i = meteors.length - 1; i >= 0; i--) {
-                const meteor = meteors[i];
+            // Mermi-ateş topu çarpışması
+            for (let i = enemyFires.length - 1; i >= 0; i--) {
+                const fire = enemyFires[i];
                 
                 for (let j = bullets.length - 1; j >= 0; j--) {
                     const bullet = bullets[j];
                     
                     if (
-                        bullet.x < meteor.x + meteor.width &&
-                        bullet.x + bullet.width > meteor.x &&
-                        bullet.y < meteor.y + meteor.height &&
-                        bullet.y + bullet.height > meteor.y
+                        bullet.x < fire.x + fire.width &&
+                        bullet.x + bullet.width > fire.x &&
+                        bullet.y < fire.y + fire.height &&
+                        bullet.y + bullet.height > fire.y
                     ) {
                         // Çarpışma oldu
-                        meteor.health--;
+                        fire.health--;
                         bullets.splice(j, 1);
                         
-                        if (meteor.health <= 0) {
-                            createExplosion(meteor.x + meteor.width / 2, meteor.y + meteor.height / 2, meteor.width / 2);
-                            meteors.splice(i, 1);
-                            score += 10;
+                        if (fire.health <= 0) {
+                            createExplosion(fire.x + fire.width / 2, fire.y + fire.height / 2, fire.width / 2);
+                            enemyFires.splice(i, 1);
+                            score += 15;
                         } else {
                             // Hasar aldı ama yok olmadı
                             createExplosion(
@@ -719,21 +924,21 @@
                 }
             }
             
-            // Jet-göktaşı çarpışması
-            for (let i = meteors.length - 1; i >= 0; i--) {
-                const meteor = meteors[i];
+            // Jet-ateş topu çarpışması
+            for (let i = enemyFires.length - 1; i >= 0; i--) {
+                const fire = enemyFires[i];
                 
                 if (
-                    jet.x < meteor.x + meteor.width &&
-                    jet.x + jet.width > meteor.x &&
-                    jet.y < meteor.y + meteor.height &&
-                    jet.y + jet.height > meteor.y
+                    jet.x < fire.x + fire.width &&
+                    jet.x + jet.width > fire.x &&
+                    jet.y < fire.y + fire.height &&
+                    jet.y + jet.height > fire.y
                 ) {
                     // Çarpışma oldu
-                    createExplosion(meteor.x + meteor.width / 2, meteor.y + meteor.height / 2, meteor.width / 2);
+                    createExplosion(fire.x + fire.width / 2, fire.y + fire.height / 2, fire.width / 2);
                     createExplosion(jet.x + jet.width / 2, jet.y + jet.height / 2, jet.width / 2);
-                    meteors.splice(i, 1);
-                    health -= 20;
+                    enemyFires.splice(i, 1);
+                    health -= 25;
                     updateUI();
                     
                     if (health <= 0) {
@@ -747,25 +952,25 @@
                 }
             }
             
-            // Klon jet-göktaşı çarpışması
+            // Klon jet-ateş topu çarpışması
             if (cloneJet) {
-                for (let i = meteors.length - 1; i >= 0; i--) {
-                    const meteor = meteors[i];
+                for (let i = enemyFires.length - 1; i >= 0; i--) {
+                    const fire = enemyFires[i];
                     
                     if (
-                        cloneJet.x < meteor.x + meteor.width &&
-                        cloneJet.x + jet.width > meteor.x &&
-                        cloneJet.y < meteor.y + meteor.height &&
-                        cloneJet.y + jet.height > meteor.y
+                        cloneJet.x < fire.x + fire.width &&
+                        cloneJet.x + jet.width > fire.x &&
+                        cloneJet.y < fire.y + fire.height &&
+                        cloneJet.y + jet.height > fire.y
                     ) {
                         // Çarpışma oldu
-                        createExplosion(meteor.x + meteor.width / 2, meteor.y + meteor.height / 2, meteor.width / 2);
-                        meteors.splice(i, 1);
+                        createExplosion(fire.x + fire.width / 2, fire.y + fire.height / 2, fire.width / 2);
+                        enemyFires.splice(i, 1);
                     }
                 }
             }
             
-            // Jet-güç kutusu çarpışması
+            // Jet-iksir çarpışması
             for (let i = powerups.length - 1; i >= 0; i--) {
                 const powerup = powerups[i];
                 
@@ -775,7 +980,7 @@
                     jet.y < powerup.y + powerup.height &&
                     jet.y + jet.height > powerup.y
                 ) {
-                    // Güç kutusu toplandı
+                    // İksir toplandı
                     applyPowerup(powerup.type);
                     powerups.splice(i, 1);
                     
@@ -783,7 +988,7 @@
                     createExplosion(
                         powerup.x + powerup.width / 2,
                         powerup.y + powerup.height / 2,
-                        20,
+                        30,
                         false,
                         powerup.type === 'health' ? '#2ecc71' : 
                         powerup.type === 'clone' ? '#3498db' : 
@@ -797,8 +1002,8 @@
             const now = Date.now();
             powerupActive = type;
             powerupEndTime = now + (type === 'health' ? 0 : 
-                                  type === 'clone' ? 10000 : 
-                                  type === 'speed' ? 8000 : 12000);
+                              type === 'clone' ? 10000 : 
+                              type === 'speed' ? 8000 : 12000);
             
             switch(type) {
                 case 'health':
@@ -820,11 +1025,17 @@
                     break;
                     
                 case 'double':
-                    // Çift ateş zaten shootBullet fonksiyonunda işleniyor
+                    // Üçlü ateş zaten shootBullet fonksiyonunda işleniyor
                     break;
             }
             
             updateUI();
+            
+            // Güç alındı efekti
+            ctx.fillStyle = type === 'health' ? 'rgba(46, 204, 113, 0.5)' : 
+                          type === 'clone' ? 'rgba(52, 152, 219, 0.5)' : 
+                          type === 'speed' ? 'rgba(231, 76, 60, 0.5)' : 'rgba(155, 89, 182, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
         
         function updatePowerTimer(timestamp) {
@@ -842,7 +1053,7 @@
                         break;
                         
                     case 'double':
-                        // Çift ateş sona erdi
+                        // Üçlü ateş sona erdi
                         break;
                 }
                 
@@ -854,7 +1065,7 @@
                 document.getElementById('powerup').textContent = 
                     powerupActive === 'clone' ? `Klon (${remaining}s)` :
                     powerupActive === 'speed' ? `Hız Artışı (${remaining}s)` :
-                    powerupActive === 'double' ? `Çift Ateş (${remaining}s)` : '';
+                    powerupActive === 'double' ? `Üçlü Ateş (${remaining}s)` : '';
             }
         }
         
@@ -871,7 +1082,7 @@
             });
             
             // Patlama parçacıkları oluştur
-            const particleCount = size * 3;
+            const particleCount = size * 5;
             for (let i = 0; i < particleCount; i++) {
                 const baseColor = color || `hsl(${Math.random() * 60 + 10}, 100%, 50%)`;
                 
@@ -900,9 +1111,9 @@
                 // Hasar yazısı
                 if (explosion.showDamage) {
                     ctx.fillStyle = `rgba(255, 50, 50, ${1 - progress})`;
-                    ctx.font = 'bold 16px Arial';
+                    ctx.font = 'bold 20px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText(`-20`, explosion.x, explosion.y - 30 - progress * 20);
+                    ctx.fillText(`-25`, explosion.x, explosion.y - 30 - progress * 20);
                 }
                 
                 // Parçacıkları güncelle ve çiz
@@ -919,16 +1130,16 @@
                     ctx.fill();
                     
                     // Alev efekti
-                    if (Math.random() < 0.3) {
+                    if (Math.random() < 0.5) {
                         const flameColor = explosion.color ? 
-                                          explosion.color.replace(')', `, ${alpha * 0.5})`) : 
-                                          `rgba(255, ${Math.random() * 100 + 100}, 0, ${alpha * 0.5})`;
+                                          explosion.color.replace(')', `, ${alpha * 0.7})`) : 
+                                          `rgba(255, ${Math.random() * 100 + 100}, 0, ${alpha * 0.7})`;
                         ctx.fillStyle = flameColor;
                         ctx.beginPath();
                         ctx.arc(
-                            particle.x + (Math.random() - 0.5) * 10,
-                            particle.y + (Math.random() - 0.5) * 10,
-                            particle.radius * 1.5,
+                            particle.x + (Math.random() - 0.5) * 15,
+                            particle.y + (Math.random() - 0.5) * 15,
+                            particle.radius * 2,
                             0,
                             Math.PI * 2
                         );
